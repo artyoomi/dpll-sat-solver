@@ -41,7 +41,7 @@ bool Clause::apply_literal(const Literal& literal)
     }
 
     // If literal not found in clause
-    return false;
+    return true;
 }
 
 std::ostream& operator<<(std::ostream& os, const Clause& obj)

@@ -6,6 +6,7 @@
 #include <sstream>
 #include <vector>
 #include <limits>
+#include <unordered_map>
 
 #include <cassert>
 
@@ -22,7 +23,8 @@ public:
     const Clause& operator[](size_t index) const;
     Clause&       operator[](size_t index);
 
-    std::pair<bool, std::vector<Literal>> apply_literal(const Literal& literal);
+    std::pair<bool, std::vector<Literal>> apply(const Literal& literal);
+    std::pair<bool, std::vector<Literal>> apply(const std::vector<Literal>& literals);
 
     friend std::ostream& operator<<(std::ostream& os, const CNF& obj);
 

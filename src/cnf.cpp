@@ -94,13 +94,17 @@ Clause& CNF::operator[](size_t index)
  * for unit and empty clauses.
  *
  * @param literal literal to apply
- * @return true if CNF still can be solved, else false (need to backtrack)
+ * @return returns true and unit clauses vector if formula still solvable, else
+ *         false and empty unit clauses vector
  */
-std::pair<bool, std::vector<Literal>> CNF::apply_literal(const Literal& literal)
+std::pair<bool, std::vector<Literal>> CNF::apply(const Literal& literal)
 {
     if (literal.var() < 0 || literal.var() > this->_vars_count) {
         throw std::invalid_argument("Trying to apply unknown literal");
     }
+
+    // To detect opposite literals in unit clauses
+    std::unordered_map<int, bool> detector;
 
     bool                 still_solvable = true;
     std::vector<Literal> unit_clauses;
@@ -114,13 +118,45 @@ std::pair<bool, std::vector<Literal>> CNF::apply_literal(const Literal& literal)
         // Empty clause detected -> need to backtrack
         } else if (this->_data[i].empty()) {
             still_solvable = false;
+            unit_clauses.clear();
             goto finalize;
-        // Capture unit clause literal
+        // Capture unit clause literal to return it from function
         } else if (this->_data[i].size() == 1) {
-            unit_clauses.emplace_back(this->_data[i][0]);
+            // If such unit clause not detected yet -> just add it
+            if (detector.find(this->_data[i][0].var()) == detector.end()) {
+                detector[this->_data[i][0].var()] = this->_data[i][0].neg();
+                unit_clauses.emplace_back(this->_data[i][0]);
+            // If such literal already was detected, but with different
+            // negotiation -> it is not solvable anymore
+            } else if (detector[this->_data[i][0].var()] != this->_data[i][0].neg()) {
+                still_solvable = false;
+                unit_clauses.clear();
+                goto finalize;
+            }
         }
     }
 finalize:
+    return {still_solvable, unit_clauses};
+}
+
+std::pair<bool, std::vector<Literal>> CNF::apply(const std::vector<Literal>& literals)
+{
+    // Detects if within unit clauses exists opposite
+    std::unordered_map<int, bool> detector;
+
+    bool still_solvable = true;
+    std::vector<Literal> unit_clauses;
+
+    /*  Apply function for single literal detects all unit clauses. So we need
+     *  to capture only the last unit clauses returned by this function.
+     */
+    for (const auto& literal : literals) {
+        std::tie(still_solvable, unit_clauses) = apply(literal);
+        if (!still_solvable) {
+            break;
+        }
+    }
+
     return {still_solvable, unit_clauses};
 }
 

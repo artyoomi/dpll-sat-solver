@@ -15,7 +15,8 @@ public:
     int  var() const;
     bool neg() const;
 
-    bool operator==(const Literal& other) const;
+    bool    operator==(const Literal& other) const;
+    Literal operator!() const;
 
     friend std::ostream& operator<<(std::ostream& os, const Literal& obj);
 

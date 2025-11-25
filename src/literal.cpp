@@ -39,6 +39,11 @@ bool Literal::operator==(const Literal& other) const
     return this->_var == other._var && this->_neg == other._neg;
 }
 
+Literal Literal::operator!() const
+{
+    return Literal(this->_var, !this->_neg);
+}
+
 std::ostream& operator<<(std::ostream& os, const Literal& obj)
 {
     if (obj._var == 0) {
