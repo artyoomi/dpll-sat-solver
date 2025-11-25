@@ -13,9 +13,12 @@ std::pair<int, std::vector<Clause>> CNF::_parse_dimacs(const std::string& filena
     }
 
     std::vector<Clause> clauses;
-    int                 config_vars_count;
-    int                 config_clauses_count;
+    bool                config_appeared      = false;
+    int                 config_vars_count    = 0;
+    int                 config_clauses_count = 0;
 
+    // Count of appeared clauses
+    int         count = 0;
     std::string line;
     while (std::getline(f_in, line)) {
         if (line.empty() || line[0] == 'c') {
@@ -31,15 +34,20 @@ std::pair<int, std::vector<Clause>> CNF::_parse_dimacs(const std::string& filena
             */
             iss.ignore(std::numeric_limits<std::streamsize>::max(), ' ');
 
+            config_appeared = true;
+
             std::string formula_type;
             iss >> formula_type;
-            if (formula_type != "cnf") {
-                throw std::invalid_argument(
-                    "Unsupported formula type, supported: cnf"
-                );
-            }
+            assert(formula_type == "cnf" &&
+                   "Unsupported formula type, supported: cnf");
+
             iss >> config_vars_count;
+            assert(config_vars_count > 0 &&
+                   "Variables count must be positive");
+
             iss >> config_clauses_count;
+            assert(config_clauses_count > 0 &&
+                   "Clauses count must be positive");
 
             continue;
         }
@@ -49,13 +57,19 @@ std::pair<int, std::vector<Clause>> CNF::_parse_dimacs(const std::string& filena
         // Parse line
         int var = -1;
         std::istringstream iss(line);
-        while (iss >> var) {
+        while (iss >> var && config_appeared && count < config_clauses_count) {
+            ++count;
+
             if (var == 0) {
                 assert(!literals.empty() && "Empty clause in input file");
                 break;
             }
 
+            assert(std::abs(var) <= config_vars_count &&
+                   "Unknown variable appeared in input file");
+
             literals.emplace_back(Literal(var));
+
         }
 
         clauses.emplace_back(literals);
