@@ -16,7 +16,7 @@ public:
     const Literal& operator[](size_t index) const;
     Literal&       operator[](size_t index);
 
-    bool apply_literal(const Literal& literal);
+    bool apply(const Literal& literal);
 
     friend std::ostream& operator<<(std::ostream& os, const Clause& obj);
 

@@ -60,37 +60,73 @@ bool DPLL(CNF cnf,
         return true;
     }
 
+    if (cnf[0].empty()) {
+        // std::cerr << cnf << '\n';
+        throw std::runtime_error("First clause must have at least one literal");
+    }
+
     // Simple heuristic - just use first literal in first clause
     Literal literal = cnf[0][0];
 
     bool                 still_solvable = true;
     std::vector<Literal> unit_clauses;
 
-    // Standard branch
-    CNF                  standard_branch_cnf        = cnf;
-    std::vector<Literal> standard_branch_assignment = assignment;
+    // Helper: apply a literal then fully propagate unit clauses.
+    // Returns {still_solvable, collected_unit_literals} and modifies cnf in place.
+    auto apply_and_propagate = [&](CNF &c, const Literal &lit, std::vector<Literal> &branch_assignment)
+        -> std::pair<bool, std::vector<Literal>>
+    {
+        std::vector<Literal> collected_units;
 
-    std::tie(std::ignore, unit_clauses) = standard_branch_cnf.apply(literal);
-    standard_branch_assignment.emplace_back(literal);
-    std::tie(still_solvable, std::ignore) = standard_branch_cnf.apply(unit_clauses);
-    standard_branch_assignment.insert(standard_branch_assignment.end(),
-                                      unit_clauses.begin(), unit_clauses.end());
-    if (still_solvable && DPLL(standard_branch_cnf, standard_branch_assignment)) {
-        assignment = standard_branch_assignment;
-        return true;
+        // 1) apply the chosen literal and check result
+        bool ok;
+        std::vector<Literal> units;
+        std::tie(ok, units) = c.apply(lit);
+        if (!ok) return {false, {}};
+
+        // record the chosen literal
+        branch_assignment.emplace_back(lit);
+
+        // 2) propagate units until no new ones appear
+        while (!units.empty()) {
+            // append units to assignment
+            collected_units.insert(collected_units.end(), units.begin(), units.end());
+            branch_assignment.insert(branch_assignment.end(), units.begin(), units.end());
+
+            // apply the discovered units and get next wave
+            std::tie(ok, units) = c.apply(units);
+            if (!ok) return {false, {}};
+        }
+
+        return {true, collected_units};
+    };
+
+    // Standard branch
+    {
+        CNF                  standard_branch_cnf        = cnf;
+        std::vector<Literal> standard_branch_assignment = assignment;
+
+        bool ok;
+        std::tie(ok, std::ignore) = apply_and_propagate(standard_branch_cnf, literal, standard_branch_assignment);
+        // std::tie(ok, std::ignore) = cnf.apply(literal);
+        if (ok && DPLL(standard_branch_cnf, standard_branch_assignment)) {
+            assignment = standard_branch_assignment;
+            return true;
+        }
     }
 
     // Opposite branch
-    CNF                  opposite_branch_cnf        = cnf;
-    std::vector<Literal> opposite_branch_assignment = assignment;
-    std::tie(std::ignore, unit_clauses) = opposite_branch_cnf.apply(!literal);
-    opposite_branch_assignment.emplace_back(!literal);
-    std::tie(still_solvable, std::ignore) = opposite_branch_cnf.apply(unit_clauses);
-    opposite_branch_assignment.insert(opposite_branch_assignment.end(),
-                                      unit_clauses.begin(), unit_clauses.end());
-    if (still_solvable && DPLL(opposite_branch_cnf, opposite_branch_assignment)) {
-        assignment = opposite_branch_assignment;
-        return true;
+    {
+        CNF                  opposite_branch_cnf        = cnf;
+        std::vector<Literal> opposite_branch_assignment = assignment;
+
+        bool ok;
+        std::tie(ok, std::ignore) = apply_and_propagate(opposite_branch_cnf, !literal, opposite_branch_assignment);
+        // std::tie(ok, std::ignore) = cnf.apply(!literal);
+        if (ok && DPLL(opposite_branch_cnf, opposite_branch_assignment)) {
+            assignment = opposite_branch_assignment;
+            return true;
+        }
     }
 
     return false;
@@ -120,15 +156,10 @@ std::pair<bool, std::vector<Literal>> solve(CNF cnf)
      *  guaranteed that it will not make formula unsatisfiable. If it happened,
      *  then pure literals were found incorrectly.
      */
-    for (const auto& literal : pure_literals) {
-        /*  For now let's ignore unit clauses, they will be processed in more
-         *  centralized manner below in main logic.
-         */
-        bool still_solvable;
-        std::tie(still_solvable, std::ignore) = cnf.apply(literal);
-        if (!still_solvable) {
-            throw std::logic_error("CNF become unsatisfiable after applying pure literals");
-        }
+    bool still_solvable = true;
+    std::tie(still_solvable, std::ignore) = cnf.apply(pure_literals);
+    if (!still_solvable) {
+        throw std::logic_error("CNF become unsatisfiable after applying pure literals");
     }
 
     // Formula solved by pure literals, so just return them

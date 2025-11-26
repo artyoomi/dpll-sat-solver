@@ -57,10 +57,9 @@ std::pair<int, std::vector<Clause>> CNF::_parse_dimacs(const std::string& filena
         // Parse line
         int var = -1;
         std::istringstream iss(line);
-        while (iss >> var && config_appeared && count < config_clauses_count) {
-            ++count;
-
+        while (iss >> var && config_appeared) {
             if (var == 0) {
+                ++count;
                 assert(!literals.empty() && "Empty clause in input file");
                 break;
             }
@@ -73,6 +72,10 @@ std::pair<int, std::vector<Clause>> CNF::_parse_dimacs(const std::string& filena
         }
 
         clauses.emplace_back(literals);
+
+        if (count == config_clauses_count) {
+            break;
+        }
     }
 
     return {config_vars_count, clauses};
@@ -104,7 +107,7 @@ Clause& CNF::operator[](size_t index)
 }
 
 /**
- * Apply literal to formula and simplify if available. It also searches
+ * Apply literal to formula and simplify while available. It also searches
  * for unit and empty clauses.
  *
  * @param literal literal to apply
@@ -123,14 +126,17 @@ std::pair<bool, std::vector<Literal>> CNF::apply(const Literal& literal)
     bool                 still_solvable = true;
     std::vector<Literal> unit_clauses;
 
-    for (size_t i = 0; i < this->_data.size(); ++i) {
-        bool curr_result = this->_data[i].apply_literal(literal);
-
+    size_t i = 0;
+    while (i < this->_data.size()) {
+        bool curr_result = this->_data[i].apply(literal);
         // If current literal solved clause -> this clause can be deleted from formula
         if (curr_result) {
             this->_data.erase(this->_data.begin() + i);
+            continue;
+        }
+
         // Empty clause detected -> need to backtrack
-        } else if (this->_data[i].empty()) {
+        if (this->_data[i].empty()) {
             still_solvable = false;
             unit_clauses.clear();
             goto finalize;
@@ -140,14 +146,17 @@ std::pair<bool, std::vector<Literal>> CNF::apply(const Literal& literal)
             if (detector.find(this->_data[i][0].var()) == detector.end()) {
                 detector[this->_data[i][0].var()] = this->_data[i][0].neg();
                 unit_clauses.emplace_back(this->_data[i][0]);
-            // If such literal already was detected, but with different
-            // negotiation -> it is not solvable anymore
+            /*  If such literal already was detected, but with different
+             *  negotiation -> it is not solvable anymore
+             */
             } else if (detector[this->_data[i][0].var()] != this->_data[i][0].neg()) {
                 still_solvable = false;
                 unit_clauses.clear();
                 goto finalize;
             }
         }
+
+        ++i;
     }
 finalize:
     return {still_solvable, unit_clauses};
@@ -158,14 +167,14 @@ std::pair<bool, std::vector<Literal>> CNF::apply(const std::vector<Literal>& lit
     // Detects if within unit clauses exists opposite
     std::unordered_map<int, bool> detector;
 
-    bool still_solvable = true;
+    bool                 still_solvable = true;
     std::vector<Literal> unit_clauses;
 
     /*  Apply function for single literal detects all unit clauses. So we need
      *  to capture only the last unit clauses returned by this function.
      */
     for (const auto& literal : literals) {
-        std::tie(still_solvable, unit_clauses) = apply(literal);
+        std::tie(still_solvable, unit_clauses) = this->apply(literal);
         if (!still_solvable) {
             break;
         }

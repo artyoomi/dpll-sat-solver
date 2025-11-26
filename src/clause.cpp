@@ -24,13 +24,18 @@ Literal& Clause::operator[](size_t index)
     return this->_data.at(index);
 }
 
-bool Clause::apply_literal(const Literal& literal)
+/**
+ * Applies literal to clause.
+ *
+ * @param literal literal to apply
+ * @return true if clause was solved by literal else false
+ */
+bool Clause::apply(const Literal& literal)
 {
     for (size_t i = 0; i < this->_data.size(); ++i) {
         if (this->_data[i].var() == literal.var()) {
             // X = 1 if X in clause => clause satisfied
             if (this->_data[i].neg() == literal.neg()) {
-                this->_data = std::vector<Literal>({Literal(true)});
                 return true;
             // X = 1 if (not X) in clause => (not X) = 0 => erase (not X) from clause
             } else {
@@ -40,8 +45,8 @@ bool Clause::apply_literal(const Literal& literal)
         }
     }
 
-    // If literal not found in clause
-    return true;
+    // If literal not found in clause -> it is not solve it
+    return false;
 }
 
 std::ostream& operator<<(std::ostream& os, const Clause& obj)
