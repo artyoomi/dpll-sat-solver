@@ -1,4 +1,5 @@
 import os
+import re
 import tarfile
 import urllib.request
 import subprocess
@@ -102,7 +103,7 @@ class SATBenchmark:
                 [self.solver_path, cnf_file],
                 capture_output=True,
                 text=True,
-                timeout=300,  # 5 minute timeout
+                timeout=3600,  # 5 minute timeout
             )
             execution_time = time.time() - start_time
 
@@ -176,7 +177,18 @@ class SATBenchmark:
             for file in files:
                 if file.endswith(".cnf"):
                     cnf_files.append(os.path.join(root, file))
-        return sorted(cnf_files)
+
+        # After all we need to return them in variables ascending order.
+        # If we will just sort them, it will not work.
+        cnf_files = sorted(
+            cnf_files,
+            key=lambda fname: (
+                int(match.group(2)),
+                int(match.group(3))
+            ) if (match := re.match(r'(uf|uff)(\d+)-(\d+).cnf', os.path.basename(fname)))
+            else (float('inf'), float('inf'))
+        )
+        return cnf_files
 
     def run_benchmark(self):
         """Run the complete benchmark"""
